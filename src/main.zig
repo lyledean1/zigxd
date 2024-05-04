@@ -42,6 +42,9 @@ pub fn main() !void {
     var start: usize = 0;
 
     while (i < arr.items.len) {
+        if (i % 2 == 0) {
+            std.debug.print(" ", .{});
+        }
         if (i % 16 == 0) {
             if (i != 0) {
                 start = i;
@@ -51,10 +54,10 @@ pub fn main() !void {
             }
             std.debug.print("{x:0>8}: ", .{i});
         }
-        const hexSlice = arr.items[i .. i + 2];
+        const hexSlice = arr.items[i .. i + 1];
         const hexString = std.fmt.fmtSliceHexLower(hexSlice);
-        std.debug.print("{x:02} ", .{hexString});
-        i += 2;
+        std.debug.print("{x:01}", .{hexString});
+        i += 1;
     }
 
     const end = i;
