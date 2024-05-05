@@ -23,9 +23,6 @@ pub fn main() !void {
     var arr = std.ArrayList(u8).init(allocator);
     defer arr.deinit();
 
-    var line_count: usize = 0;
-    var byte_count: usize = 0;
-
     // todo: reorder this to do in one pass
     while (true) {
         reader.streamUntilDelimiter(arr.writer(), '\n', null) catch |err| switch (err) {
@@ -34,34 +31,38 @@ pub fn main() !void {
         };
         // readded the new line to keep line address matching up
         try arr.append('\n');
-        line_count += 1;
-        byte_count += arr.items.len;
     }
 
-    var i: usize = 0;
-    var start: usize = 0;
+    try printOutXxdFormattedFile(arr);
+}
 
+fn printOutXxdFormattedFile(arr: std.ArrayList(u8)) !void {
+    var i: usize = 0;
+    var startOfLine: usize = 0;
     while (i < arr.items.len) {
         if (i % 2 == 0) {
             std.debug.print(" ", .{});
         }
         if (i % 16 == 0) {
             if (i != 0) {
-                start = i;
+                startOfLine = i;
                 std.debug.print(" ", .{});
                 printBytesToAscii(arr.items[i - 16 .. i]);
                 std.debug.print("\n", .{});
             }
+            // print memory address
             std.debug.print("{x:0>8}: ", .{i});
         }
-        const hexSlice = arr.items[i .. i + 1];
-        const hexString = std.fmt.fmtSliceHexLower(hexSlice);
-        std.debug.print("{x:01}", .{hexString});
+        // print byte
+        std.debug.print("{x:01}", .{std.fmt.fmtSliceHexLower(arr.items[i .. i + 1])});
         i += 1;
     }
+    try printLastXxdLine(arr, i, startOfLine);
+}
 
-    const end = i;
-
+fn printLastXxdLine(arr: std.ArrayList(u8), index: usize, startOfLine: usize) !void {
+    var i = index;
+    const endOfLine = i;
     while (i % 16 != 0) {
         std.debug.print("  ", .{});
         i += 1;
@@ -69,9 +70,8 @@ pub fn main() !void {
             std.debug.print(" ", .{});
         }
     }
-
     std.debug.print(" ", .{});
-    printBytesToAscii(arr.items[start..end]);
+    printBytesToAscii(arr.items[startOfLine..endOfLine]);
     std.debug.print("\n", .{});
 }
 
@@ -79,6 +79,7 @@ fn printBytesToAscii(out: []u8) void {
     for (out) |c| {
         if (c >= 0x20 and c <= 0x7E) {
             std.debug.print("{c}", .{c});
+            continue;
         } else {
             std.debug.print(".", .{});
         }
