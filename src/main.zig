@@ -14,6 +14,13 @@ pub fn main() !void {
     }
     const filename = args[1];
 
+    var arr = try readFileContents(filename, allocator);
+    defer arr.deinit();
+
+    try printOutXxdFormattedFile(arr);
+}
+
+fn readFileContents(filename: []const u8, allocator: std.mem.Allocator) !std.ArrayList(u8) {
     var file = try std.fs.cwd().openFile(filename, .{});
     defer file.close();
 
@@ -21,9 +28,7 @@ pub fn main() !void {
     var reader = buffered.reader();
 
     var arr = std.ArrayList(u8).init(allocator);
-    defer arr.deinit();
 
-    // todo: reorder this to do in one pass
     while (true) {
         reader.streamUntilDelimiter(arr.writer(), '\n', null) catch |err| switch (err) {
             error.EndOfStream => break,
@@ -32,8 +37,7 @@ pub fn main() !void {
         // readded the new line to keep line address matching up
         try arr.append('\n');
     }
-
-    try printOutXxdFormattedFile(arr);
+    return arr;
 }
 
 fn printOutXxdFormattedFile(arr: std.ArrayList(u8)) !void {
@@ -70,7 +74,7 @@ fn printLastXxdLine(arr: std.ArrayList(u8), index: usize, startOfLine: usize) !v
             std.debug.print(" ", .{});
         }
     }
-    std.debug.print(" ", .{});
+    std.debug.print("  ", .{});
     printBytesToAscii(arr.items[startOfLine..endOfLine]);
     std.debug.print("\n", .{});
 }

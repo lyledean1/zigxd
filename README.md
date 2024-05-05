@@ -1,6 +1,6 @@
 # zigxd
 
-A minimal `xxd` version built in Zig. 
+A minimal hacky `xxd` version built in Zig to learn the language. 
 
 # Run locally 
 
