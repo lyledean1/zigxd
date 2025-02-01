@@ -1,91 +1,78 @@
 const std = @import("std");
-const bufPrint = std.fmt.bufPrint;
+
+const Config = struct {
+    bytes_per_line: usize = 16,
+    show_ascii: bool = true,
+};
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
     if (args.len < 2) {
-        std.debug.print("Usage: {s} <filename>\n", .{args[0]});
-        return;
+        try std.io.getStdErr().writer().print("Usage: {s} <filename>\n", .{args[0]});
+        std.process.exit(1);
     }
+
     const filename = args[1];
-
-    var arr = try readFileContents(filename, allocator);
-    defer arr.deinit();
-
-    try printOutXxdFormattedFile(arr);
+    try hexDumpFile(filename, allocator, .{});
 }
 
-fn readFileContents(filename: []const u8, allocator: std.mem.Allocator) !std.ArrayList(u8) {
+fn hexDumpFile(filename: []const u8, allocator: std.mem.Allocator, config: Config) !void {
     var file = try std.fs.cwd().openFile(filename, .{});
     defer file.close();
 
-    var buffered = std.io.bufferedReader(file.reader());
-    var reader = buffered.reader();
+    var buf = try allocator.alloc(u8, config.bytes_per_line);
+    defer allocator.free(buf);
 
-    var arr = std.ArrayList(u8).init(allocator);
+    const reader = file.reader();
+    var offset: usize = 0;
 
     while (true) {
-        reader.streamUntilDelimiter(arr.writer(), '\n', null) catch |err| switch (err) {
-            error.EndOfStream => break,
-            else => return err,
-        };
-        // readded the new line to keep line address matching up
-        try arr.append('\n');
+        const bytes_read = try reader.read(buf);
+        if (bytes_read == 0) break;
+
+        try printHexDumpLine(offset, buf[0..bytes_read], config);
+        offset += bytes_read;
     }
-    return arr;
 }
 
-fn printOutXxdFormattedFile(arr: std.ArrayList(u8)) !void {
+fn printHexDumpLine(offset: usize, bytes: []const u8, config: Config) !void {
+    const stdout = std.io.getStdOut().writer();
+
+    try stdout.print("{x:0>8}: ", .{offset});
+
+    for (bytes, 0..) |byte, i| {
+        if (i % 2 == 0 and i != 0) {
+            try stdout.print(" ", .{});
+        }
+        try stdout.print("{x:0>2}", .{byte});
+    }
+
+    const padding_needed = config.bytes_per_line - bytes.len;
     var i: usize = 0;
-    var startOfLine: usize = 0;
-    while (i < arr.items.len) {
-        if ((i % 2 == 0) and (i != 0)) {
-            std.debug.print(" ", .{});
+    while (i < padding_needed) : (i += 1) {
+        if ((bytes.len + i) % 2 == 0) {
+            try stdout.print(" ", .{});
         }
-        if (i % 16 == 0) {
-            if (i != 0) {
-                startOfLine = i;
-                std.debug.print(" ", .{});
-                printBytesToAscii(arr.items[i - 16 .. i]);
-                std.debug.print("\n", .{});
-            }
-            // print memory address
-            std.debug.print("{x:0>8}: ", .{i});
-        }
-        // print byte
-        std.debug.print("{x:01}", .{std.fmt.fmtSliceHexLower(arr.items[i .. i + 1])});
-        i += 1;
+        try stdout.print("  ", .{});
     }
-    try printLastXxdLine(arr, i, startOfLine);
+
+    if (config.show_ascii) {
+        try stdout.print("  ", .{});
+        for (bytes) |byte| {
+            const c = if (isPrintableAscii(byte)) byte else '.';
+            try stdout.print("{c}", .{c});
+        }
+    }
+
+    try stdout.print("\n", .{});
 }
 
-fn printLastXxdLine(arr: std.ArrayList(u8), index: usize, startOfLine: usize) !void {
-    var i = index;
-    const endOfLine = i;
-    while (i % 16 != 0) {
-        std.debug.print("  ", .{});
-        i += 1;
-        if (i % 2 == 0) {
-            std.debug.print(" ", .{});
-        }
-    }
-    std.debug.print("  ", .{});
-    printBytesToAscii(arr.items[startOfLine..endOfLine]);
-    std.debug.print("\n", .{});
-}
-
-fn printBytesToAscii(out: []u8) void {
-    for (out) |c| {
-        if (c >= 0x20 and c <= 0x7E) {
-            std.debug.print("{c}", .{c});
-            continue;
-        } else {
-            std.debug.print(".", .{});
-        }
-    }
+fn isPrintableAscii(byte: u8) bool {
+    return byte >= 0x20 and byte <= 0x7E;
 }
