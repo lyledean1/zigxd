@@ -44,7 +44,7 @@ fn printOutXxdFormattedFile(arr: std.ArrayList(u8)) !void {
     var i: usize = 0;
     var startOfLine: usize = 0;
     while (i < arr.items.len) {
-        if (i % 2 == 0) {
+        if ((i % 2 == 0) and (i != 0)) {
             std.debug.print(" ", .{});
         }
         if (i % 16 == 0) {
